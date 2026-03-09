@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>로또 조합 분석기</title>
+
+<style>
+
+body{
+font-family:Arial;
+padding:20px;
+}
+
+button{
+margin:5px;
+padding:10px;
+}
+
+input{
+padding:6px;
+margin:3px;
+}
+
+.result{
+margin-top:10px;
+max-height:300px;
+overflow:auto;
+border:1px solid #ccc;
+padding:10px;
+}
+
+.count{
+font-weight:bold;
+margin-top:5px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>구조 입력</h2>
+
+<input id="pattern" placeholder="예: 2 1 2 1">
+
+<button onclick="generateColorPatterns()">색 조합 계산</button>
+
+<div id="colorPatterns"></div>
+
+<hr>
+
+<h2>홀짝 비율</h2>
+
+<input id="odd" type="number" placeholder="홀수 개수">
+<input id="even" type="number" placeholder="짝수 개수">
+
+<button onclick="generateNumbers()">숫자 조합 생성</button>
+
+<div class="result" id="numbers"></div>
+
+<hr>
+
+<h2>포함 숫자 필터</h2>
+
+<input id="includeNumbers" placeholder="예: 7,9,10">
+
+<button onclick="filterNumbers()">적용</button>
+
+<h3>최종결과</h3>
+
+<div class="count" id="count1"></div>
+
+<div class="result" id="filtered"></div>
+
+<hr>
+
+<h2>제외 숫자 필터</h2>
+
+<input id="excludeNumbers" placeholder="예: 3,14,22">
+
+<button onclick="excludeNumbers()">적용</button>
+
+<h3>최종결과2</h3>
+
+<div class="count" id="count2"></div>
+
+<div class="result" id="filtered2"></div>
+
+<hr>
+
+<h2>합계 필터</h2>
+
+<input id="sumMin" placeholder="최소 합">
+<input id="sumMax" placeholder="최대 합">
+
+<button onclick="sumFilter()">적용</button>
+
+<h3>최종결과3</h3>
+
+<div class="count" id="count3"></div>
+
+<div class="result" id="filtered3"></div>
+
+<hr>
+
+<h2>AC값 필터</h2>
+
+<input id="acMin" placeholder="AC 최소">
+<input id="acMax" placeholder="AC 최대">
+
+<button onclick="acFilter()">적용</button>
+
+<h3>최종결과4</h3>
+
+<div class="count" id="count4"></div>
+
+<div class="result" id="filtered4"></div>
+
+<hr>
+
+<h2>AC값 분석기</h2>
+
+<input id="acInput" placeholder="예: 9,12,17,22,32,34">
+
+<button onclick="analyzeAC()">AC 계산</button>
+
+<div class="result" id="acResult"></div>
+
+<script>
+
+const colorRanges={
+노:[1,10],
+파:[11,20],
+빨:[21,30],
+검:[31,40],
+초:[41,45]
+}
+
+const colors=["노","파","빨","검","초"]
+
+let savedColorPatterns=[]
+let allCombinations=[]
+let filteredCombinations=[]
+let filteredCombinations2=[]
+let filteredCombinations3=[]
+
+function getColor(n){
+
+if(n<=10)return "노"
+if(n<=20)return "파"
+if(n<=30)return "빨"
+if(n<=40)return "검"
+return "초"
+
+}
+
+function colorString(nums){
+
+return nums.map(n=>getColor(n)).join(",")
+
+}
+
+function generateColorPatterns(){
+
+let pattern=document.getElementById("pattern").value.trim().split(" ").map(Number)
+
+let results=[]
+
+function dfs(start,depth,path){
+
+if(depth===pattern.length){
+
+results.push([...path])
+
+return
+}
+
+for(let i=start;i<colors.length;i++){
+
+let block=[]
+
+for(let j=0;j<pattern[depth];j++) block.push(colors[i])
+
+path.push(block)
+
+dfs(i+1,depth+1,path)
+
+path.pop()
+
+}
+
+}
+
+dfs(0,0,[])
+
+savedColorPatterns=results
+
+let html=""
+
+results.forEach(p=>{
+
+html+=p.flat().join("")+"<br>"
+
+})
+
+document.getElementById("colorPatterns").innerHTML=html
+
+}
+
+function generateNumbers(){
+
+let odd=parseInt(document.getElementById("odd").value)
+let even=parseInt(document.getElementById("even").value)
+
+allCombinations=[]
+
+for(let pattern of savedColorPatterns){
+
+function dfs(idx,current){
+
+if(idx===pattern.length){
+
+let flat=current.flat()
+
+if(flat.length!==6)return
+
+let o=flat.filter(n=>n%2).length
+let e=flat.filter(n=>n%2===0).length
+
+if(o===odd && e===even){
+
+let sorted=[...flat].sort((a,b)=>a-b)
+
+let key=sorted.join(",")
+
+if(!allCombinations.includes(key))
+allCombinations.push(key)
+
+}
+
+return
+
+}
+
+let color=pattern[idx][0]
+
+let range=colorRanges[color]
+
+let arr=[]
+
+for(let i=range[0];i<=range[1];i++)arr.push(i)
+
+function pick(start,chosen){
+
+if(chosen.length===pattern[idx].length){
+
+dfs(idx+1,[...current,chosen])
+return
+
+}
+
+for(let i=start;i<arr.length;i++){
+
+if(current.flat().includes(arr[i]))continue
+
+pick(i+1,[...chosen,arr[i]])
+
+}
+
+}
+
+pick(0,[])
+
+}
+
+dfs(0,[])
+
+}
+
+document.getElementById("numbers").innerHTML=allCombinations.join("<br>")
+
+}
+
+function filterNumbers(){
+
+let include=document.getElementById("includeNumbers").value
+.split(",")
+.map(Number)
+.filter(n=>!isNaN(n))
+
+filteredCombinations=allCombinations.filter(c=>{
+
+let nums=c.split(",").map(Number)
+
+return include.every(n=>nums.includes(n))
+
+})
+
+let html=""
+
+filteredCombinations.forEach(c=>{
+
+let nums=c.split(",").map(Number)
+
+html+=c+" ("+colorString(nums)+")<br>"
+
+})
+
+document.getElementById("filtered").innerHTML=html
+
+document.getElementById("count1").innerHTML="조합 개수 : "+filteredCombinations.length
+
+}
+
+function excludeNumbers(){
+
+let exclude=document.getElementById("excludeNumbers").value
+.split(",")
+.map(Number)
+.filter(n=>!isNaN(n))
+
+filteredCombinations2=filteredCombinations.filter(c=>{
+
+let nums=c.split(",").map(Number)
+
+return !exclude.some(n=>nums.includes(n))
+
+})
+
+let html=""
+
+filteredCombinations2.forEach(c=>{
+
+let nums=c.split(",").map(Number)
+
+html+=c+" ("+colorString(nums)+")<br>"
+
+})
+
+document.getElementById("filtered2").innerHTML=html
+
+document.getElementById("count2").innerHTML="조합 개수 : "+filteredCombinations2.length
+
+}
+
+function sumFilter(){
+
+let min=parseInt(document.getElementById("sumMin").value)
+let max=parseInt(document.getElementById("sumMax").value)
+
+filteredCombinations3=filteredCombinations2.filter(c=>{
+
+let nums=c.split(",").map(Number)
+
+let sum=nums.reduce((a,b)=>a+b,0)
+
+return sum>=min && sum<=max
+
+})
+
+let html=""
+
+filteredCombinations3.forEach(c=>{
+
+let nums=c.split(",").map(Number)
+
+html+=c+" ("+colorString(nums)+")<br>"
+
+})
+
+document.getElementById("filtered3").innerHTML=html
+
+document.getElementById("count3").innerHTML="조합 개수 : "+filteredCombinations3.length
+
+}
+
+function calculateAC(nums){
+
+nums=[...nums].sort((a,b)=>a-b)
+
+let diffs=[]
+let steps=""
+
+for(let i=0;i<nums.length;i++){
+
+for(let j=i+1;j<nums.length;j++){
+
+let diff=nums[j]-nums[i]
+
+diffs.push(diff)
+
+steps+=nums[j]+"-"+nums[i]+" = "+diff+"<br>"
+
+}
+
+}
+
+let unique=[...new Set(diffs)]
+
+let ac=unique.length-(nums.length-1)
+
+return{steps,diffs,unique,ac}
+
+}
+
+function acFilter(){
+
+let min=parseInt(document.getElementById("acMin").value)
+let max=parseInt(document.getElementById("acMax").value)
+
+let final=[]
+
+filteredCombinations3.forEach(c=>{
+
+let nums=c.split(",").map(Number)
+
+let ac=calculateAC(nums).ac
+
+if(ac>=min && ac<=max) final.push(c)
+
+})
+
+let html=""
+
+final.forEach(c=>{
+
+let nums=c.split(",").map(Number)
+
+html+=c+" ("+colorString(nums)+")<br>"
+
+})
+
+document.getElementById("filtered4").innerHTML=html
+
+document.getElementById("count4").innerHTML="조합 개수 : "+final.length
+
+}
+
+function analyzeAC(){
+
+let nums=document.getElementById("acInput").value
+.split(",")
+.map(Number)
+
+let data=calculateAC(nums)
+
+let html=""
+
+html+="<b>차이 계산</b><br>"+data.steps
+
+html+="<br><b>총 차이</b><br>"+data.diffs.join(",")
+
+html+="<br><br><b>중복 제거</b><br>"+data.unique.join(",")
+
+html+="<br><br><b>AC값</b><br>"+data.ac
+
+document.getElementById("acResult").innerHTML=html
+
+}
+
+</script>
+
+</body>
+</html>
