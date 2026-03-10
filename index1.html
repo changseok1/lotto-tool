@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>로또 조합 분석기</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+:root{
+  --bg:#0f172a;
+  --bg2:#020617;
+  --panel:#111827;
+  --panel2:#1f2937;
+  --line:#334155;
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:Arial,sans-serif;color:var(--text);background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 100%);}
+.wrap{max-width:1400px;margin:0 auto;padding:24px;}
+h1{margin:0 0 8px;font-size:30px;}
+.sub{color:var(--muted);line-height:1.6;margin-bottom:20px;}
+.grid{display:grid;grid-template-columns:420px 1fr;gap:20px;align-items:start;}
+.card{background:rgba(17,24,39,0.92);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 12px 28px rgba(0,0,0,0.25);}
+.section-title{margin:0 0 12px;font-size:18px;color:#fff;}
+.help{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:10px;}
+label{display:block;margin:10px 0 6px;font-size:13px;color:#cbd5e1;}
+input,button{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:14px;}
+button{border:none;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#0284c7,#2563eb);}
+button:hover{filter:brightness(1.08);}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-stack{display:grid;gap:10px;margin-top:14px;}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;}
+.stat{background:rgba(31,41,55,0.85);border:1px solid var(--line);border-radius:16px;padding:14px;}
+.stat .k{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.stat .v{font-size:22px;font-weight:700;}
+.panel-gap{display:grid;gap:16px;}
+.result{margin-top:10px;max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:14px;background:rgba(2,6,23,0.55);padding:12px;line-height:1.6;white-space:normal;word-break:break-word;}
+.count{font-weight:bold;margin-top:5px;color:#fff;}
+hr{border:none;border-top:1px solid rgba(51,65,85,0.7);margin:18px 0;}
+.block-title{margin:0 0 8px;font-size:16px;color:#fff;}
+.small{font-size:12px;color:var(--muted);}
+.warn{color:#fde68a;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.35);padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.45;margin-top:12px;}
+@media (max-width:1100px){.grid{grid-template-columns:1fr;}.stats{grid-template-columns:1fr 1fr;}}
+@media (max-width:700px){.stats{grid-template-columns:1fr;}.row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>로또 조합 분석기</h1>
+  <div class="sub">
+    구조 입력부터 시작해서 색 조합 계산 → 홀짝 숫자 조합 생성 → 구간 → 끝수 → 포함/제외 → 합계 → AC → 대각선 필터 순서로 사용할 수 있습니다.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 class="section-title">입력 패널</h2>
+      <div class="help">
+        구조는 예: <b>2 1 2 1</b> 형태로 입력합니다.<br>
+        구조 합은 6이어야 하며, 색상 순서는 노 → 파 → 빨 → 검 → 초 순서를 유지합니다.
+      </div>
+
+      <h3 class="block-title">구조 입력</h3>
+      <label for="pattern">구조</label>
+      <input id="pattern" placeholder="예: 2 1 2 1">
+      <div class="btn-stack">
+        <button onclick="generateColorPatterns()">색 조합 계산</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">홀짝 비율</h3>
+      <div class="row">
+        <div>
+          <label for="odd">홀수 개수</label>
+          <input id="odd" type="number" placeholder="홀수 개수">
+        </div>
+        <div>
+          <label for="even">짝수 개수</label>
+          <input id="even" type="number" placeholder="짝수 개수">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="generateNumbers()">숫자 조합 생성</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">구간 필터</h3>
+      <div class="row">
+        <div>
+          <label for="sectionMin">최소 사용 구간 수</label>
+          <input id="sectionMin" type="number" placeholder="예: 3">
+        </div>
+        <div>
+          <label for="sectionMax">최대 사용 구간 수</label>
+          <input id="sectionMax" type="number" placeholder="예: 5">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="sectionFilter()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">끝수 필터</h3>
+      <div class="row">
+        <div>
+          <label for="endDigitDupMin">끝수 중복 최소</label>
+          <input id="endDigitDupMin" type="number" placeholder="예: 0">
+        </div>
+        <div>
+          <label for="endDigitDupMax">끝수 중복 최대</label>
+          <input id="endDigitDupMax" type="number" placeholder="예: 2">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="endDigitFilter()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">포함 숫자 필터</h3>
+      <label for="includeNumbers">포함 숫자</label>
+      <input id="includeNumbers" placeholder="예: 7,9,10">
+      <div class="btn-stack">
+        <button onclick="filterNumbers()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">제외 숫자 필터</h3>
+      <label for="excludeNumbers">제외 숫자</label>
+      <input id="excludeNumbers" placeholder="예: 3,14,22">
+      <div class="btn-stack">
+        <button onclick="excludeNumbers()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">합계 필터</h3>
+      <div class="row">
+        <div>
+          <label for="sumMin">최소 합</label>
+          <input id="sumMin" type="number" placeholder="최소 합">
+        </div>
+        <div>
+          <label for="sumMax">최대 합</label>
+          <input id="sumMax" type="number" placeholder="최대 합">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="sumFilter()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">AC값 필터</h3>
+      <div class="row">
+        <div>
+          <label for="acMin">AC 최소</label>
+          <input id="acMin" type="number" placeholder="AC 최소">
+        </div>
+        <div>
+          <label for="acMax">AC 최대</label>
+          <input id="acMax" type="number" placeholder="AC 최대">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="acFilter()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">대각선 필터</h3>
+      <div class="row">
+        <div>
+          <label for="diagMin">대각선 패턴 최소</label>
+          <input id="diagMin" type="number" placeholder="예: 0">
+        </div>
+        <div>
+          <label for="diagMax">대각선 패턴 최대</label>
+          <input id="diagMax" type="number" placeholder="예: 3">
+        </div>
+      </div>
+      <div class="btn-stack">
+        <button onclick="diagonalFilter()">적용</button>
+      </div>
+
+      <hr>
+
+      <h3 class="block-title">대각선 분석기</h3>
+      <label for="diagInput">직접 분석할 숫자 6개</label>
+      <input id="diagInput" placeholder="예: 9,12,17,22,32,34">
+      <div class="btn-stack">
+        <button onclick="analyzeDiagonal()">대각선 분석</button>
+      </div>
+
+      <hr>
+
+     
+        구조 설정부터 바로 계산되며, 45C6 전체 계산과 CSV 다운로드 기능은 제거한 버전입니다.
+      </div>
+    </div>
+
+    <div>
+      <div class="stats">
+        <div class="stat"><div class="k">색 조합 수</div><div class="v" id="statPatterns">0</div></div>
+        <div class="stat"><div class="k">숫자 조합 수</div><div class="v" id="statAll">0</div></div>
+        <div class="stat"><div class="k">구간 필터 수</div><div class="v" id="statSection">0</div></div>
+        <div class="stat"><div class="k">끝수 필터 수</div><div class="v" id="statEnd">0</div></div>
+        <div class="stat"><div class="k">최종 대각선 필터 수</div><div class="v" id="statDiag">0</div></div>
+      </div>
+
+      <div class="panel-gap">
+        <div class="card">
+          <h2 class="section-title">색 조합 결과</h2>
+          <div class="small">구조 입력 후 계산된 색 조합입니다.</div>
+          <div id="colorPatterns" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">숫자 조합 생성 결과</h2>
+          <div class="small">홀짝 비율 조건을 만족하는 전체 숫자 조합입니다.</div>
+          <div class="count" id="countNumbers"></div>
+          <div id="numbers" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">구간 필터 결과</h2>
+          <div class="count" id="countSection"></div>
+          <div id="sectioned" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">끝수 필터 결과</h2>
+          <div class="count" id="countEnd"></div>
+          <div id="ended" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">포함 숫자 필터 결과</h2>
+          <div class="count" id="count1"></div>
+          <div id="filtered" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">제외 숫자 필터 결과</h2>
+          <div class="count" id="count2"></div>
+          <div id="filtered2" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">합계 필터 결과</h2>
+          <div class="count" id="count3"></div>
+          <div id="filtered3" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">AC값 필터 결과</h2>
+          <div class="count" id="count4"></div>
+          <div id="filtered4" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">대각선 필터 결과</h2>
+          <div class="count" id="countDiag"></div>
+          <div id="filteredDiag" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">대각선 분석 결과</h2>
+          <div id="diagAnalyzeResult" class="result">아직 결과가 없습니다.</div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">AC값 분석 결과</h2>
+          <div id="acResult" class="result">아직 결과가 없습니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const colorRanges = {
+  노:[1,10], 파:[11,20], 빨:[21,30], 검:[31,40], 초:[41,45]
+};
+const colors = ["노","파","빨","검","초"];
+
+let savedColorPatterns = [];
+let allCombinations = [];
+let filteredSectionCombinations = [];
+let filteredEndDigitCombinations = [];
+let filteredCombinations = [];
+let filteredCombinations2 = [];
+let filteredCombinations3 = [];
+let filtered4Data = [];
+let filteredDiagonalCombinations = [];
+
+function updateStats(){
+  document.getElementById("statPatterns").textContent = savedColorPatterns.length;
+  document.getElementById("statAll").textContent = allCombinations.length;
+  document.getElementById("statSection").textContent = filteredSectionCombinations.length;
+  document.getElementById("statEnd").textContent = filteredEndDigitCombinations.length;
+  document.getElementById("statDiag").textContent = filteredDiagonalCombinations.length;
+}
+
+function getColor(n){
+  if(n<=10) return "노";
+  if(n<=20) return "파";
+  if(n<=30) return "빨";
+  if(n<=40) return "검";
+  return "초";
+}
+
+function colorString(nums){
+  return nums.map(n=>getColor(n)).join(",");
+}
+
+function parsePatternInput(){
+  const raw = document.getElementById("pattern").value.trim();
+  if(!raw) return null;
+  const nums = raw.split(/\s+/).map(Number).filter(n=>!isNaN(n));
+  if(!nums.length) return null;
+  return nums;
+}
+
+function generateColorPatterns(){
+  const pattern = parsePatternInput();
+  if(!pattern){
+    document.getElementById("colorPatterns").innerHTML = "구조를 입력하세요.";
+    return;
+  }
+  const sum = pattern.reduce((a,b)=>a+b,0);
+  if(sum !== 6){
+    document.getElementById("colorPatterns").innerHTML = "구조 합은 반드시 6이어야 합니다.";
+    savedColorPatterns = [];
+    updateStats();
+    return;
+  }
+  if(pattern.length > 5){
+    document.getElementById("colorPatterns").innerHTML = "색상은 5개이므로 구조 칸 수는 최대 5개입니다.";
+    savedColorPatterns = [];
+    updateStats();
+    return;
+  }
+
+  let results = [];
+  function dfs(start, depth, path){
+    if(depth === pattern.length){
+      results.push([...path]);
+      return;
+    }
+    for(let i=start; i<colors.length; i++){
+      const block = [];
+      for(let j=0; j<pattern[depth]; j++) block.push(colors[i]);
+      path.push(block);
+      dfs(i+1, depth+1, path);
+      path.pop();
+    }
+  }
+  dfs(0, 0, []);
+  savedColorPatterns = results;
+
+  let html = "";
+  results.forEach(p=>{ html += p.flat().join("") + "<br>"; });
+  document.getElementById("colorPatterns").innerHTML = html || "결과 없음";
+  updateStats();
+}
+
+function generateNumbers(){
+  const odd = parseInt(document.getElementById("odd").value);
+  const even = parseInt(document.getElementById("even").value);
+  if(savedColorPatterns.length === 0){
+    document.getElementById("numbers").innerHTML = "먼저 구조를 계산하세요.";
+    return;
+  }
+  if(isNaN(odd) || isNaN(even) || odd + even !== 6){
+    document.getElementById("numbers").innerHTML = "홀수와 짝수 개수를 올바르게 입력하세요. 합은 6이어야 합니다.";
+    return;
+  }
+
+  allCombinations = [];
+  const seen = new Set();
+
+  for(const pattern of savedColorPatterns){
+    function dfs(idx, current){
+      if(idx === pattern.length){
+        const flat = current.flat();
+        if(flat.length !== 6) return;
+        const o = flat.filter(n=>n%2).length;
+        const e = flat.filter(n=>n%2===0).length;
+        if(o === odd && e === even){
+          const sorted = [...flat].sort((a,b)=>a-b);
+          const key = sorted.join(",");
+          if(!seen.has(key)){
+            seen.add(key);
+            allCombinations.push(key);
+          }
+        }
+        return;
+      }
+
+      const color = pattern[idx][0];
+      const range = colorRanges[color];
+      const arr = [];
+      for(let i=range[0]; i<=range[1]; i++) arr.push(i);
+
+      function pick(start, chosen){
+        if(chosen.length === pattern[idx].length){
+          dfs(idx+1, [...current, chosen]);
+          return;
+        }
+        for(let i=start; i<arr.length; i++){
+          if(current.flat().includes(arr[i])) continue;
+          pick(i+1, [...chosen, arr[i]]);
+        }
+      }
+      pick(0, []);
+    }
+    dfs(0, []);
+  }
+
+  document.getElementById("numbers").innerHTML = allCombinations.join("<br>") || "결과 없음";
+  document.getElementById("countNumbers").innerHTML = "조합 개수 : " + allCombinations.length;
+
+  filteredSectionCombinations = [];
+  filteredEndDigitCombinations = [];
+  filteredCombinations = [];
+  filteredCombinations2 = [];
+  filteredCombinations3 = [];
+  filtered4Data = [];
+  filteredDiagonalCombinations = [];
+  updateStats();
+}
+
+function getSectionIndex(n){
+  if(n<=10) return 1;
+  if(n<=20) return 2;
+  if(n<=30) return 3;
+  if(n<=40) return 4;
+  return 5;
+}
+
+function countUsedSections(nums){
+  return new Set(nums.map(getSectionIndex)).size;
+}
+
+function sectionFilter(){
+  const min = parseInt(document.getElementById("sectionMin").value);
+  const max = parseInt(document.getElementById("sectionMax").value);
+  if(allCombinations.length === 0){
+    document.getElementById("sectioned").innerHTML = "먼저 숫자 조합을 생성하세요.";
+    return;
+  }
+  if(isNaN(min) || isNaN(max) || min > max){
+    document.getElementById("sectioned").innerHTML = "구간 최소/최대 값을 올바르게 입력하세요.";
+    return;
+  }
+  filteredSectionCombinations = allCombinations.filter(c=>{
+    const nums = c.split(",").map(Number);
+    const used = countUsedSections(nums);
+    return used >= min && used <= max;
+  });
+  let html = "";
+  filteredSectionCombinations.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("sectioned").innerHTML = html || "결과 없음";
+  document.getElementById("countSection").innerHTML = "조합 개수 : " + filteredSectionCombinations.length;
+  updateStats();
+}
+
+function endDigitDuplicateCount(nums){
+  const counts = {};
+  nums.forEach(n=>{
+    const d = n % 10;
+    counts[d] = (counts[d] || 0) + 1;
+  });
+  let dup = 0;
+  Object.values(counts).forEach(v=>{ if(v >= 2) dup += v; });
+  return dup;
+}
+
+function endDigitFilter(){
+  const min = parseInt(document.getElementById("endDigitDupMin").value);
+  const max = parseInt(document.getElementById("endDigitDupMax").value);
+  if(filteredSectionCombinations.length === 0){
+    document.getElementById("ended").innerHTML = "먼저 구간 필터를 적용하세요.";
+    return;
+  }
+  if(isNaN(min) || isNaN(max) || min > max){
+    document.getElementById("ended").innerHTML = "끝수 최소/최대 값을 올바르게 입력하세요.";
+    return;
+  }
+  filteredEndDigitCombinations = filteredSectionCombinations.filter(c=>{
+    const nums = c.split(",").map(Number);
+    const dup = endDigitDuplicateCount(nums);
+    return dup >= min && dup <= max;
+  });
+  let html = "";
+  filteredEndDigitCombinations.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("ended").innerHTML = html || "결과 없음";
+  document.getElementById("countEnd").innerHTML = "조합 개수 : " + filteredEndDigitCombinations.length;
+  updateStats();
+}
+
+function filterNumbers(){
+  const include = document.getElementById("includeNumbers").value.split(",").map(v=>Number(v.trim())).filter(n=>!isNaN(n));
+  if(filteredEndDigitCombinations.length === 0){
+    document.getElementById("filtered").innerHTML = "먼저 끝수 필터를 적용하세요.";
+    return;
+  }
+  filteredCombinations = filteredEndDigitCombinations.filter(c=>{
+    const nums = c.split(",").map(Number);
+    return include.every(n=>nums.includes(n));
+  });
+  let html = "";
+  filteredCombinations.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("filtered").innerHTML = html || "결과 없음";
+  document.getElementById("count1").innerHTML = "조합 개수 : " + filteredCombinations.length;
+}
+
+function excludeNumbers(){
+  const exclude = document.getElementById("excludeNumbers").value.split(",").map(v=>Number(v.trim())).filter(n=>!isNaN(n));
+  if(filteredCombinations.length === 0){
+    document.getElementById("filtered2").innerHTML = "먼저 포함 숫자 필터를 적용하세요.";
+    return;
+  }
+  filteredCombinations2 = filteredCombinations.filter(c=>{
+    const nums = c.split(",").map(Number);
+    return !exclude.some(n=>nums.includes(n));
+  });
+  let html = "";
+  filteredCombinations2.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("filtered2").innerHTML = html || "결과 없음";
+  document.getElementById("count2").innerHTML = "조합 개수 : " + filteredCombinations2.length;
+}
+
+function sumFilter(){
+  const min = parseInt(document.getElementById("sumMin").value);
+  const max = parseInt(document.getElementById("sumMax").value);
+  if(filteredCombinations2.length === 0){
+    document.getElementById("filtered3").innerHTML = "먼저 제외 숫자 필터를 적용하세요.";
+    return;
+  }
+  if(isNaN(min) || isNaN(max) || min > max){
+    document.getElementById("filtered3").innerHTML = "합계 최소/최대 값을 올바르게 입력하세요.";
+    return;
+  }
+  filteredCombinations3 = filteredCombinations2.filter(c=>{
+    const nums = c.split(",").map(Number);
+    const sum = nums.reduce((a,b)=>a+b,0);
+    return sum >= min && sum <= max;
+  });
+  let html = "";
+  filteredCombinations3.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("filtered3").innerHTML = html || "결과 없음";
+  document.getElementById("count3").innerHTML = "조합 개수 : " + filteredCombinations3.length;
+}
+
+function calculateAC(nums){
+  nums = [...nums].sort((a,b)=>a-b);
+  const diffs = [];
+  let steps = "";
+  for(let i=0;i<nums.length;i++){
+    for(let j=i+1;j<nums.length;j++){
+      const diff = nums[j]-nums[i];
+      diffs.push(diff);
+      steps += nums[j] + "-" + nums[i] + " = " + diff + "<br>";
+    }
+  }
+  const unique = [...new Set(diffs)];
+  const ac = unique.length - (nums.length - 1);
+  return {steps,diffs,unique,ac};
+}
+
+function acFilter(){
+  const min = parseInt(document.getElementById("acMin").value);
+  const max = parseInt(document.getElementById("acMax").value);
+  if(filteredCombinations3.length === 0){
+    document.getElementById("filtered4").innerHTML = "먼저 합계 필터를 적용하세요.";
+    return;
+  }
+  if(isNaN(min) || isNaN(max) || min > max){
+    document.getElementById("filtered4").innerHTML = "AC 최소/최대 값을 올바르게 입력하세요.";
+    return;
+  }
+  filtered4Data = filteredCombinations3.filter(c=>{
+    const nums = c.split(",").map(Number);
+    const ac = calculateAC(nums).ac;
+    return ac >= min && ac <= max;
+  });
+  let html = "";
+  filtered4Data.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ")<br>";
+  });
+  document.getElementById("filtered4").innerHTML = html || "결과 없음";
+  document.getElementById("count4").innerHTML = "조합 개수 : " + filtered4Data.length;
+}
+
+function diagonalLineCount(nums){
+  const diagonalGroups = [
+    [1,9,17,25,33,41],[2,10,18,26,34,42],[3,11,19,27,35,43],[4,12,20,28,36,44],[5,13,21,29,37,45],[6,14,22,30,38],[7,15,23,31,39],[8,16,24,32,40],
+    [7,13,19,25,31,37,43],[6,12,18,24,30,36],[5,11,17,23,29,35],[4,10,16,22,28,34,40],[3,9,15,21,27,33,39,45],[2,8,14,20,26,32,38,44],[1,7,13,19,25,31,37],[8,14,20,26,32,38],[15,21,27,33,39,45]
+  ];
+  let count = 0;
+  for(const line of diagonalGroups){
+    const hit = line.filter(n=>nums.includes(n)).length;
+    if(hit >= 2) count++;
+  }
+  return count;
+}
+
+function diagonalFilter(){
+  const min = parseInt(document.getElementById("diagMin").value);
+  const max = parseInt(document.getElementById("diagMax").value);
+  if(filtered4Data.length === 0){
+    document.getElementById("filteredDiag").innerHTML = "먼저 AC값 필터를 적용하세요.";
+    return;
+  }
+  if(isNaN(min) || isNaN(max) || min > max){
+    document.getElementById("filteredDiag").innerHTML = "대각선 최소/최대 값을 올바르게 입력하세요.";
+    return;
+  }
+  filteredDiagonalCombinations = filtered4Data.filter(c=>{
+    const nums = c.split(",").map(Number);
+    const d = diagonalLineCount(nums);
+    return d >= min && d <= max;
+  });
+  let html = "";
+  filteredDiagonalCombinations.forEach(c=>{
+    const nums = c.split(",").map(Number);
+    html += c + " (" + colorString(nums) + ") / 대각선수: " + diagonalLineCount(nums) + "<br>";
+  });
+  document.getElementById("filteredDiag").innerHTML = html || "결과 없음";
+  document.getElementById("countDiag").innerHTML = "조합 개수 : " + filteredDiagonalCombinations.length;
+  updateStats();
+}
+
+function analyzeDiagonal(){
+  const nums = document.getElementById("diagAnalyzeInput").value.split(",").map(v=>Number(v.trim())).filter(n=>!isNaN(n));
+  if(nums.length !== 6){
+    document.getElementById("diagAnalyzeResult").innerHTML = "숫자 6개를 입력하세요.";
+    return;
+  }
+  const uniqueNums = [...new Set(nums)].sort((a,b)=>a-b);
+  if(uniqueNums.length !== 6 || uniqueNums.some(n=>n < 1 || n > 45)){
+    document.getElementById("diagAnalyzeResult").innerHTML = "1~45 범위의 서로 다른 숫자 6개를 입력하세요.";
+    return;
+  }
+
+  const diagonalGroups = [
+    [1,9,17,25,33,41],[2,10,18,26,34,42],[3,11,19,27,35,43],[4,12,20,28,36,44],[5,13,21,29,37,45],[6,14,22,30,38],[7,15,23,31,39],[8,16,24,32,40],
+    [7,13,19,25,31,37,43],[6,12,18,24,30,36],[5,11,17,23,29,35],[4,10,16,22,28,34,40],[3,9,15,21,27,33,39,45],[2,8,14,20,26,32,38,44],[1,7,13,19,25,31,37],[8,14,20,26,32,38],[15,21,27,33,39,45]
+  ];
+
+  const matchedMap = new Map();
+
+  diagonalGroups.forEach(line=>{
+    const hits = line.filter(n=>uniqueNums.includes(n));
+    if(hits.length >= 2){
+      const sortedHits = [...hits].sort((a,b)=>a-b);
+      const key = sortedHits.join(",");
+      const diffs = [];
+      for(let i=1;i<sortedHits.length;i++){
+        diffs.push(sortedHits[i] - sortedHits[i-1]);
+      }
+      if(!matchedMap.has(key)){
+        matchedMap.set(key, {
+          hits: sortedHits,
+          diffs,
+          lines: [line.join(",")]
+        });
+      }else{
+        matchedMap.get(key).lines.push(line.join(","));
+      }
+    }
+  });
+
+  const matched = [...matchedMap.values()];
+
+  let html = "";
+  html += "<b>입력 조합</b><br>" + uniqueNums.join(", ");
+  html += "<br><br><b>대각선 수</b><br>" + matched.length + "개";
+  if(matched.length > 0){
+    html += "<br><br><b>해당 대각선 숫자</b><br>";
+    matched.forEach((item, idx)=>{
+      const diffText = item.diffs.length ? item.diffs.join(", ") : "없음";
+      html += (idx + 1) + ". " + item.hits.join(", ") + " / 차이: " + diffText;
+      if(item.lines.length > 1){
+        html += " <span style=\"color:#94a3b8;\">(같은 숫자 조합이 여러 대각선 라인 정의에 겹쳐 1개로 합침)</span>";
+      }
+      html += "<br>";
+    });
+  } else {
+    html += "<br><br><b>해당 대각선 숫자</b><br>없음";
+  }
+
+  html += "<br><br><b>중복 집계가 생기는 이유</b><br>기존 로직은 미리 정의된 여러 대각선 라인을 순서대로 검사하면서, 같은 입력 숫자 묶음이 서로 다른 라인 정의에 동시에 걸리면 각각 따로 세었습니다. 예를 들어 15,27,33처럼 같은 숫자 묶음이 2개의 라인 정의에 모두 포함되면 2번 집계될 수 있었습니다. 지금은 같은 숫자 묶음은 1개로 합쳐서 표시합니다.";
+
+  document.getElementById("diagAnalyzeResult").innerHTML = html;
+}
+
+function analyzeAC(){
+  const nums = document.getElementById("acInput").value.split(",").map(v=>Number(v.trim())).filter(n=>!isNaN(n));
+  if(nums.length !== 6){
+    document.getElementById("acResult").innerHTML = "숫자 6개를 입력하세요.";
+    return;
+  }
+  const data = calculateAC(nums);
+  let html = "";
+  html += "<b>차이 계산</b><br>" + data.steps;
+  html += "<br><b>총 차이</b><br>" + data.diffs.join(",");
+  html += "<br><br><b>중복 제거</b><br>" + data.unique.join(",");
+  html += "<br><br><b>AC값</b><br>" + data.ac;
+  document.getElementById("acResult").innerHTML = html;
+}
+</script>
+</body>
+</html>
